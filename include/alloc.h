@@ -1,27 +1,29 @@
-#include <stdatomic.h>
-
-
+#include <assert.h>
+#include "types.h"
 #ifndef __ALLOC_H__
 #define __ALLOC_H__
 
-#define POOL_SIZE 20
+#define MASK_CHUNK_SIZE(c) ((c) >> 4)
+#define MASK_CHUNK_STATE(c) ((c) & 0xF)
 
-#define HEAP_INIT_SIZE 0x100000 // 1 MB
+
+typedef struct {
+    uint chunk_state : 4;
+    uint chunk_size : 28;
+} __attribute__((packed)) chunk_metadata_t;
+
+
+static_assert(sizeof(chunk_metadata_t) == 4, "Chunk metadata size should be 4 byte long."); // Ensure the chunk metadata is 4 byte long  
 
 struct pool_entity {
     int field;
 };
 
 
-struct pool {
-    struct pool_entity entities[POOL_SIZE];
-    atomic_int stack_top;
-    int stack[POOL_SIZE];
-};
 
-void alloc_init(struct pool* pool);
-struct pool_entity* alloc(struct pool* pool);
+int alloc_init();
+void* alloc();
 
-void dealloc(struct pool* pool, struct pool_entity* entity);
+int dealloc(void* ptr);
 
 #endif
