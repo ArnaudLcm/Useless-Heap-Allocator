@@ -5,6 +5,9 @@
 #define __ALLOC_H__
 
 #define POOL_SIZE 20
+
+#define HEAP_INIT_SIZE 0x100000 // 1 MB
+
 struct pool_entity {
     int field;
 };
