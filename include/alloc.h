@@ -39,8 +39,9 @@ static struct list bin = INIT_LIST(NULL, NULL);
 
 extern heap_t heap_global;
 
-/* static_assert(sizeof(chunk_metadata_t) == 4,
-              "Chunk metadata size should be 4 byte long.");  // Ensure the chunk metadata is 4 byte long */
+
+_Static_assert(sizeof(chunk_metadata_t) == 4,
+              "Chunk metadata size should be 4 byte long.");  // Ensure the chunk metadata is 4 byte long
 
 int alloc_init();
 void* alloc(unsigned long size);

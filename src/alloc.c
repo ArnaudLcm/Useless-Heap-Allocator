@@ -34,23 +34,22 @@ static void free_node(struct node *n) {
 }
 
 /*
- * @brief: This function will ensure every chunks are 1 byte aligned. By default, round it up
+ * @brief: This function will ensure every chunks are 4 byte aligned. By default, round it up
  */
 static inline void *align_round_chunk(void *addr, enum RoundDirection direction) {
     uintptr_t address = (uintptr_t)addr;
 
     // If the address is already aligned, return it as is
-    if ((address & 0x7) == 0) {
+    if ((address & 3) == 0) {
         return addr;
     }
 
-    // Round up to the next multiple of 8
     switch (direction) {
         case ROUND_DOWN:
-            return (void *)(address & ~0x7);
+            return (void *)(address & ~3);
         case ROUND_UP:
         default:
-            return (void *)((address + 7) & ~0x7);
+            return (void *)((address + 3) & ~3);
     }
 }
 
@@ -85,7 +84,7 @@ int alloc_init() {
 }
 
 void *alloc(unsigned long size) {
-    size = (size + 7) & ~7;
+    size = (size + 3) & ~3;
 
     if (size > MAX_CHUNK_SIZE) {
         return NULL;
@@ -106,7 +105,6 @@ void *alloc(unsigned long size) {
 
             if (metadata->chunk_size > size) {
                 chunk_metadata_t *new_chunk_metadata = (void *)metadata + size + sizeof(chunk_metadata_t);
-
                 new_chunk_metadata->chunk_size = metadata->chunk_size - size - sizeof(chunk_metadata_t);
 
                 new_node->data = new_chunk_metadata;
@@ -126,15 +124,15 @@ void *alloc(unsigned long size) {
 int dealloc(void *ptr) {
     chunk_metadata_t *chunk_metadata = ptr - sizeof(chunk_metadata_t);
 
-    if (!ptr || (void*)chunk_metadata > heap_global.heap_end || (void*)chunk_metadata < heap_global.heap_start ||
+    if (!ptr || (void *)chunk_metadata > heap_global.heap_end || (void *)chunk_metadata < heap_global.heap_start ||
         MASK_CHUNK_STATE(chunk_metadata->chunk_state) != CHUNK_USED) {
         return -1;
     }
     struct node *new_node = allocate_node();
-    if(new_node == NULL) {
+    if (new_node == NULL) {
         return -1;
     }
-    
+
     chunk_metadata->chunk_state = CHUNK_FREE;
     new_node->data = chunk_metadata;
 
