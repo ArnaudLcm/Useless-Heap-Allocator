@@ -9,6 +9,9 @@
 #define MASK_CHUNK_SIZE(c) ((c) >> 4)
 #define MASK_CHUNK_STATE(c) ((c) & 0xF)
 
+#define CHUNK_FREE 0x0
+#define CHUNK_USED 0x1
+
 #define INIT_HEAP_SIZE 0x1000
 
 #define MAX_CHUNK_SIZE ((1 << 28) / 8)

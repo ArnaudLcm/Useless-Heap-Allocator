@@ -95,14 +95,14 @@ void *alloc(unsigned long size) {
 
     while (free_node && free_node->data) {
         chunk_metadata_t *metadata = free_node->data;
-        if (metadata->chunk_size >= size) { // Check if the chunk is large enough to handle the user request.
+        if (metadata->chunk_size >= size) {  // Check if the chunk is large enough to handle the user request.
             struct node *new_node = allocate_node();
             if (new_node == NULL) {
                 return NULL;
             }
 
             remove_node(&bin, free_node);
-            metadata->chunk_state = 0x1;
+            metadata->chunk_state = CHUNK_USED;
 
             if (metadata->chunk_size > size) {
                 chunk_metadata_t *new_chunk_metadata = (void *)metadata + size + sizeof(chunk_metadata_t);
@@ -121,4 +121,23 @@ void *alloc(unsigned long size) {
     }
 
     return NULL;
+}
+
+int dealloc(void *ptr) {
+    chunk_metadata_t *chunk_metadata = ptr - sizeof(chunk_metadata_t);
+
+    if (!ptr || (void*)chunk_metadata > heap_global.heap_end || (void*)chunk_metadata < heap_global.heap_start ||
+        MASK_CHUNK_STATE(chunk_metadata->chunk_state) != CHUNK_USED) {
+        return -1;
+    }
+    struct node *new_node = allocate_node();
+    if(new_node == NULL) {
+        return -1;
+    }
+    
+    chunk_metadata->chunk_state = CHUNK_FREE;
+    new_node->data = chunk_metadata;
+
+    add_node(&bin, new_node);
+    return 0;
 }
