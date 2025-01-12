@@ -44,7 +44,8 @@ _Static_assert(sizeof(chunk_metadata_t) == 4,
               "Chunk metadata size should be 4 byte long.");  // Ensure the chunk metadata is 4 byte long
 
 int alloc_init();
-void* alloc(unsigned long size);
+void* alloc(ulong size);
+int resize_alloc(void* ptr, ulong new_size);
 
 
 int dealloc(void* ptr);
