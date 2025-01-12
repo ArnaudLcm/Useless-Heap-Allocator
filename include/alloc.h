@@ -1,3 +1,4 @@
+#include <stdlib.h>
 #include <unistd.h>
 
 #include "list.h"
@@ -10,17 +11,11 @@
 
 #define INIT_HEAP_SIZE 0x1000
 
-#define MAX_CHUNK_SIZE 33554432  // 2**28 / 8
+#define MAX_CHUNK_SIZE ((1 << 28) / 8)
 
 #define MAX_BIN_SIZE 128  // Maximum number of nodes in the bin
 
 #define BITMAP_SIZE ((MAX_BIN_SIZE + 7) / 8)
-
-static struct node bin_nodes[MAX_BIN_SIZE] = {INIT_NODE(NULL)};
-
-static uchar node_bitmap[BITMAP_SIZE] = {0};
-
-static struct list bin = INIT_LIST(NULL, NULL);
 
 typedef struct {
     void* heap_start;
@@ -33,12 +28,21 @@ typedef struct {
 } __attribute__((packed)) chunk_metadata_t;
 
 
+static struct node bin_nodes[MAX_BIN_SIZE] = {INIT_NODE(NULL)};
+
+static uchar node_bitmap[BITMAP_SIZE] = {0};
+
+static struct list bin = INIT_LIST(NULL, NULL);
+
+static heap_t heap = {.heap_end = NULL, .heap_start = NULL};
+
 /* static_assert(sizeof(chunk_metadata_t) == 4,
               "Chunk metadata size should be 4 byte long.");  // Ensure the chunk metadata is 4 byte long */
 
-int alloc_init(heap_t* heap);
-void* alloc(heap_t* heap);
+int alloc_init();
+void* alloc(unsigned long size);
 
-int dealloc(heap_t* heap, void* ptr);
+
+int dealloc(void* ptr);
 
 #endif

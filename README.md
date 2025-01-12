@@ -32,7 +32,19 @@ Simple implementation of a heap allocator.
 **Without multi-threading solution:**
 
 
+-------
+Allocation algorithm:
+- If chunk_asked_size > MAX_CHUNK_SIZE -> Return NULL
+- Iterate over free list until node->chunk_metadata->size > chunk_asked_size
+  - Break available chunk in 2 chunks with one with the chunk_asked_size as size and the second one with the remaning space
+  - Create new node for the new chunk and append it to the bin
+  - Update chunk_metada_t of the allocated chunk as used
+  - Remove node from the bin
+  - Return to the user the new allocated chunk 
+- Return Null
+
+
+
 ### Notes - Features I could implement
 *List of features I could consider to improve the current state of the allocator*:
 - Use XOR linked lists
-- Use mmap for large allocations
