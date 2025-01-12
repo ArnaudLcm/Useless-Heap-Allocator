@@ -34,7 +34,7 @@ static uchar node_bitmap[BITMAP_SIZE] = {0};
 
 static struct list bin = INIT_LIST(NULL, NULL);
 
-static heap_t heap = {.heap_end = NULL, .heap_start = NULL};
+extern heap_t heap_global;
 
 /* static_assert(sizeof(chunk_metadata_t) == 4,
               "Chunk metadata size should be 4 byte long.");  // Ensure the chunk metadata is 4 byte long */

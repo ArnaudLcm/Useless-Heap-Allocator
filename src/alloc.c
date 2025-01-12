@@ -6,6 +6,8 @@
 #include "log.h"
 #include "types.h"
 
+heap_t heap_global = {.heap_end = NULL, .heap_start = NULL};
+
 enum RoundDirection { ROUND_UP, ROUND_DOWN };
 
 void set_node_bit(uchar *bitmap, int index) { bitmap[index / 8] |= (1 << (index % 8)); }
@@ -53,15 +55,16 @@ static inline void *align_round_chunk(void *addr, enum RoundDirection direction)
 }
 
 int alloc_init() {
-    heap.heap_start = mmap((void *)sbrk(0), INIT_HEAP_SIZE, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    heap_global.heap_start =
+        mmap((void *)sbrk(0), INIT_HEAP_SIZE, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 
-    heap.heap_end = (void *)heap.heap_start + INIT_HEAP_SIZE;
+    heap_global.heap_end = (void *)heap_global.heap_start + INIT_HEAP_SIZE;
 
-    if (heap.heap_start == MAP_FAILED) {
+    if (heap_global.heap_start == MAP_FAILED) {
         return -1;
     }
 
-    heap.heap_start = align_round_chunk(heap.heap_start, ROUND_UP);
+    heap_global.heap_start = align_round_chunk(heap_global.heap_start, ROUND_UP);
 
     struct node *first_node = allocate_node();
 
@@ -69,15 +72,15 @@ int alloc_init() {
         return -1;  // No available nodes
     }
 
-    first_node->data = heap.heap_start;
+    first_node->data = heap_global.heap_start;
 
     add_node(&bin, first_node);
 
-    chunk_metadata_t *c = heap.heap_start;
+    chunk_metadata_t *c = heap_global.heap_start;
     c->chunk_state = 0;
-    c->chunk_size = heap.heap_end - heap.heap_start - sizeof(chunk_metadata_t);
+    c->chunk_size = heap_global.heap_end - heap_global.heap_start - sizeof(chunk_metadata_t);
 
-    log_debug("Initialized heap with size %d at start %p", c->chunk_size, heap.heap_start);
+    log_debug("Initialized heap with size %d at start %p", c->chunk_size, heap_global.heap_start);
     return 0;
 }
 
@@ -88,21 +91,21 @@ void *alloc(unsigned long size) {
         return NULL;
     }
 
-    struct node *current_node = bin.head;
+    struct node *free_node = bin.head;
 
-    while (current_node && current_node->data) {
-        chunk_metadata_t *metadata = current_node->data;
-        if (metadata->chunk_size >= size) {
+    while (free_node && free_node->data) {
+        chunk_metadata_t *metadata = free_node->data;
+        if (metadata->chunk_size >= size) { // Check if the chunk is large enough to handle the user request.
             struct node *new_node = allocate_node();
             if (new_node == NULL) {
                 return NULL;
             }
 
-            remove_node(&bin, current_node);
+            remove_node(&bin, free_node);
             metadata->chunk_state = 0x1;
 
             if (metadata->chunk_size > size) {
-                chunk_metadata_t *new_chunk_metadata = (void *)metadata + metadata->chunk_size;
+                chunk_metadata_t *new_chunk_metadata = (void *)metadata + size + sizeof(chunk_metadata_t);
 
                 new_chunk_metadata->chunk_size = metadata->chunk_size - size - sizeof(chunk_metadata_t);
 
@@ -114,7 +117,7 @@ void *alloc(unsigned long size) {
             return (void *)metadata + sizeof(chunk_metadata_t);
         }
 
-        current_node = current_node->next;
+        free_node = free_node->next;
     }
 
     return NULL;
