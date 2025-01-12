@@ -1,17 +1,34 @@
 #include "list.h"
 
-static inline void INIT_LIST_HEAD(struct list_head *list) {
-    list->next = list;
-    list->prev = list;
+#include <stdlib.h>
+
+void add_node(struct list* l, struct node* new_node) {
+    new_node->next = NULL;
+    new_node->prev = NULL;
+    if(!l->head) {
+        l->head = new_node;
+        l->tail = new_node;
+        return;
+    }
+
+    l->tail->next = new_node;
+    new_node->prev = l->tail;
+    l->tail = new_node;
 }
 
-static inline void _list_add(struct list_head* new_list, struct list_head *prev, struct list_head *next) {
-    next->prev = new_list;
-    new_list->next = next;
-    new_list->prev = prev;
-    prev->next = new_list;
-}
+void remove_node(struct list* l, struct node* node) {
+    if (node->prev) {
+        node->prev->next = node->next;
+    } else {
+        l->head = node->next;
+    }
 
-static inline void list_add(struct list_head* new_list, struct list_head *head) {
-    _list_add(new_list, head, head->next);    
+    if (node->next) {
+        node->next->prev = node->prev;
+    } else {
+        l->tail = node->prev;
+    }
+
+    node->next = NULL;
+    node->prev = NULL;
 }

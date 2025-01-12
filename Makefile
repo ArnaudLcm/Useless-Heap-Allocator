@@ -47,3 +47,5 @@ $(BUILD_DIR)/%.o: src/%.c
 debug: $(TARGET) $(TEST_OBJECTS)
 	@gdb $(BUILD_DIR)/test_executable
 	
+valgrind: $(TARGET) $(TEST_OBJECTS)
+	@valgrind $(BUILD_DIR)/test_executable
