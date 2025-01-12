@@ -6,7 +6,7 @@ SHELL=/bin/sh
 CC=gcc
 FLAGS=
 BUILD_DIR=build
-CFLAGS= -fPIC -g -pthread -std=c11
+CFLAGS= -fPIC -g -pthread -std=gnu99
 DEBUGFLAGS=-O0 -D _DEBUG -g
 LDFLAGS= -shared -latomic
 TEST_LDFLAGS= -L. $(BUILD_DIR)/alloc.so -latomic

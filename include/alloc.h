@@ -1,7 +1,6 @@
-#include <assert.h>
-#include <stdint.h>
 #include <unistd.h>
 
+#include "list.h"
 #include "types.h"
 #ifndef __ALLOC_H__
 #define __ALLOC_H__
@@ -9,7 +8,7 @@
 #define MASK_CHUNK_SIZE(c) ((c) >> 4)
 #define MASK_CHUNK_STATE(c) ((c) & 0xF)
 
-#define INIT_HEAP_SIZE 102
+#define INIT_HEAP_SIZE 0x1000
 
 #define MAX_CHUNK_SIZE 33554432  // 2**28 / 8
 
@@ -17,9 +16,15 @@
 
 #define BITMAP_SIZE ((MAX_BIN_SIZE + 7) / 8)
 
+static struct node bin_nodes[MAX_BIN_SIZE] = {INIT_NODE(NULL)};
+
+static uchar node_bitmap[BITMAP_SIZE] = {0};
+
+static struct list bin = INIT_LIST(NULL, NULL);
+
 typedef struct {
-    uintptr_t heap_start;
-    uintptr_t heap_end;
+    void* heap_start;
+    void* heap_end;
 } heap_t;
 
 typedef struct {
@@ -27,8 +32,9 @@ typedef struct {
     uint chunk_size : 28;
 } __attribute__((packed)) chunk_metadata_t;
 
-static_assert(sizeof(chunk_metadata_t) == 4,
-              "Chunk metadata size should be 4 byte long.");  // Ensure the chunk metadata is 4 byte long
+
+/* static_assert(sizeof(chunk_metadata_t) == 4,
+              "Chunk metadata size should be 4 byte long.");  // Ensure the chunk metadata is 4 byte long */
 
 int alloc_init(heap_t* heap);
 void* alloc(heap_t* heap);

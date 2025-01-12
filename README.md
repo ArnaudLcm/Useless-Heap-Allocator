@@ -27,9 +27,12 @@ Simple implementation of a heap allocator.
     
   *We should have more free lists like the glibc does to be more exhaustive but for now let's remain simple.*
 
+- Free list managements: They are allocated statically and we manage which node is free through a bit map
+
 **Without multi-threading solution:**
 
 
 ### Notes - Features I could implement
 *List of features I could consider to improve the current state of the allocator*:
 - Use XOR linked lists
+- Use mmap for large allocations

@@ -1,19 +1,12 @@
 #include "alloc.h"
 
-#include <stdint.h>
-#include <unistd.h>
+#include <sys/mman.h>
 
 #include "list.h"
 #include "log.h"
 #include "types.h"
 
 enum RoundDirection { ROUND_UP, ROUND_DOWN };
-
-static struct node bin_nodes[MAX_BIN_SIZE] = {INIT_NODE(NULL)};
-
-static uchar node_bitmap[BITMAP_SIZE] = {0};
-
-static struct list bin = INIT_LIST(NULL, NULL);
 
 void set_node_bit(uchar *bitmap, int index) { bitmap[index / 8] |= (1 << (index % 8)); }
 
@@ -60,34 +53,31 @@ static void *align_round_chunk(void *addr, enum RoundDirection direction) {
 }
 
 int alloc_init(heap_t *heap) {
-    void *bottom_heap = (void *)sbrk(INIT_HEAP_SIZE);
-    if (bottom_heap == (void *)-1) {
+    heap->heap_start =
+        mmap((void *)sbrk(0), INIT_HEAP_SIZE, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+
+    heap->heap_end = (void *)heap->heap_start + INIT_HEAP_SIZE;
+
+    if (heap->heap_start == MAP_FAILED) {
         return -1;
     }
 
-    bottom_heap = align_round_chunk(bottom_heap, ROUND_UP);
-    heap->heap_start = (uintptr_t)bottom_heap;
+    heap->heap_start = align_round_chunk(heap->heap_start, ROUND_UP);
 
-    void *top_heap = (void *)sbrk(0);
-    if (top_heap == (void *)-1) {
-        return -1;
-    }
-    top_heap = align_round_chunk(top_heap, ROUND_DOWN);
-    heap->heap_end = (uintptr_t)top_heap;
-
-    // Initialize the bin with static storage
     struct node *first_node = allocate_node();
+
     if (!first_node) {
         return -1;  // No available nodes
     }
-    *first_node = INIT_NODE((void *)heap->heap_start);
 
-    struct list bin = INIT_LIST(first_node, first_node);
+    first_node->data = heap->heap_start;
 
-    chunk_metadata_t *c = (chunk_metadata_t *)heap->heap_start;
+    add_node(&bin, first_node);
+
+    chunk_metadata_t *c = heap->heap_start;
     c->chunk_state = 0;
     c->chunk_size = heap->heap_end - heap->heap_start - sizeof(chunk_metadata_t);
 
-    log_debug("Initialized heap with size %d at start %p", c->chunk_size, (void *)heap->heap_start);
+    log_debug("Initialized heap with size %d at start %p", c->chunk_size, heap->heap_start);
     return 0;
 }
