@@ -26,5 +26,10 @@ Simple implementation of a heap allocator.
     - Unsorted bin: For all other free chunks
     
   *We should have more free lists like the glibc does to be more exhaustive but for now let's remain simple.*
+
 **Without multi-threading solution:**
 
+
+### Notes - Features I could implement
+*List of features I could consider to improve the current state of the allocator*:
+- Use XOR linked lists
