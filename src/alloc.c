@@ -84,47 +84,54 @@ int alloc_init() {
 }
 
 void *alloc(unsigned long size) {
-    size = (size + 3) & ~3;
+    size = (size + sizeof(void *) - 1) & ~(sizeof(void *) - 1);
 
     if (size > MAX_CHUNK_SIZE) {
         return NULL;
     }
 
-    struct node *free_node = bin.head;
-    struct node *smallest_free_node = free_node;
-    while (free_node && free_node->data) {
-        chunk_metadata_t *metadata = free_node->data;
-        if (metadata->chunk_size >= size) {  // Check if the chunk is large enough to handle the user request.
-            chunk_metadata_t *smallest_chunk = smallest_free_node->data;
-            smallest_free_node = (metadata->chunk_size < smallest_chunk->chunk_size) ? free_node : smallest_free_node;
+    // Find the smallest suitable free node
+    struct node *smallest_free_node = NULL;
+    chunk_metadata_t *smallest_metadata = NULL;
+
+    for (struct node *current = bin.head; current; current = current->next) {
+        chunk_metadata_t *metadata = current->data;
+        if (metadata && metadata->chunk_size >= size) {
+            if (!smallest_free_node || metadata->chunk_size < smallest_metadata->chunk_size) {
+                smallest_free_node = current;
+                smallest_metadata = metadata;
+            }
         }
-        free_node = free_node->next;
     }
 
-    if (smallest_free_node->data) {
-        chunk_metadata_t *smallest_chunk = smallest_free_node->data;
+    if (!smallest_free_node || !smallest_metadata) {
+        return NULL; // No suitable chunk found
+    }
+
+    remove_node(&bin, smallest_free_node);
+
+    smallest_metadata->chunk_state = CHUNK_USED;
+
+    // Check if splitting the chunk is necessary
+    unsigned long remaining_size = smallest_metadata->chunk_size - size - sizeof(chunk_metadata_t);
+    if (remaining_size > sizeof(chunk_metadata_t)) {
+        chunk_metadata_t *new_metadata = (void *)smallest_metadata + size + sizeof(chunk_metadata_t);
+        new_metadata->chunk_size = remaining_size;
+        new_metadata->chunk_state = CHUNK_FREE;
+
         struct node *new_node = allocate_node();
-        if (new_node == NULL) {
+        if (!new_node) {
             return NULL;
         }
-
-        remove_node(&bin, smallest_free_node);
-        smallest_chunk->chunk_state = CHUNK_USED;
-
-        if (smallest_chunk->chunk_size > size) {
-            chunk_metadata_t *new_chunk_metadata = (void *)smallest_chunk + size + sizeof(chunk_metadata_t);
-            new_chunk_metadata->chunk_size = smallest_chunk->chunk_size - size - sizeof(chunk_metadata_t);
-
-            new_node->data = new_chunk_metadata;
-
-            add_node(&bin, new_node);
-        }
-
-        return (void *)smallest_chunk + sizeof(chunk_metadata_t);
+        new_node->data = new_metadata;
+        add_node(&bin, new_node);
     }
 
-    return NULL;
+    smallest_metadata->chunk_size = size;
+
+    return (void *)smallest_metadata + sizeof(chunk_metadata_t);
 }
+
 
 static void coalesce(struct node *node) {
     chunk_metadata_t *metadata = node->data;
