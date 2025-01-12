@@ -85,7 +85,7 @@ int alloc_init() {
 }
 
 void *alloc(unsigned long size) {
-    //@TODO: Ensure size will lead to alignment
+    size = (size + 7) & ~7;
 
     if (size > MAX_CHUNK_SIZE) {
         return NULL;

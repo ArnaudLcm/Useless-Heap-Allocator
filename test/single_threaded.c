@@ -1,4 +1,5 @@
 #include "single_threaded.h"
+#include <stdint.h>
 
 #include "alloc.h"
 #include "test.h"
@@ -22,8 +23,13 @@ void test_valid_chunk_alloc_and_dealloc() {
     ASSERT_TRUE(dealloc(new_alloc) == 0);
 
     ASSERT_TRUE(dealloc(new_alloc) == -1); // Check that we can't double free
+}
 
 
+void test_alloc_chunk_with_padding() {
+    void* new_alloc = alloc(1 << 2);
+    void* second_alloc = alloc(1 << 4);
+    ASSERT_TRUE(((uintptr_t)second_alloc & 0x7) == 0);
 }
 
 void test_single_threaded_batch() {
@@ -31,4 +37,5 @@ void test_single_threaded_batch() {
     test_too_large_chunk_alloc();
     test_valid_chunk_alloc();
     test_valid_chunk_alloc_and_dealloc();
+    test_alloc_chunk_with_padding();
 }
