@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <unistd.h>
+#include <stdalign.h>
 
 #include "list.h"
 #include "types.h"
@@ -19,6 +20,8 @@
 #define MAX_BIN_SIZE 128  // Maximum number of nodes in the bin
 
 #define BITMAP_SIZE ((MAX_BIN_SIZE + 7) / 8)
+
+#define ARCH_ALIGNMENT alignof(void *)
 
 typedef struct {
     void* heap_start;

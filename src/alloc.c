@@ -40,16 +40,16 @@ static inline void *align_round_chunk(void *addr, enum RoundDirection direction)
     uintptr_t address = (uintptr_t)addr;
 
     // If the address is already aligned, return it as is
-    if ((address & 3) == 0) {
+    if ((address & (ARCH_ALIGNMENT - 1)) == 0) {
         return addr;
     }
 
     switch (direction) {
         case ROUND_DOWN:
-            return (void *)(address & ~3);
+            return (void *)(address & ~(ARCH_ALIGNMENT - 1));
         case ROUND_UP:
         default:
-            return (void *)((address + 3) & ~3);
+            return (void *)((address + ARCH_ALIGNMENT - 1) & ~(ARCH_ALIGNMENT - 1));
     }
 }
 
@@ -84,7 +84,7 @@ int alloc_init() {
 }
 
 void *alloc(unsigned long size) {
-    size = (size + sizeof(void *) - 1) & ~(sizeof(void *) - 1);
+    size = (size + ARCH_ALIGNMENT - 1) & ~(ARCH_ALIGNMENT - 1);
 
     if (size > MAX_CHUNK_SIZE) {
         return NULL;

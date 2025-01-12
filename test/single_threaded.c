@@ -23,7 +23,7 @@ void test_valid_chunk_alloc_and_dealloc() {
 void test_alloc_chunk_with_padding() {
     void* new_alloc = alloc(1 << 2);
     void* second_alloc = alloc(1 << 4);
-    ASSERT_TRUE(((uintptr_t)second_alloc & 0x3) == 0);
+    ASSERT_TRUE(((uintptr_t)second_alloc & (ARCH_ALIGNMENT - 1)) == 0);
 }
 
 void test_single_threaded_batch() {
