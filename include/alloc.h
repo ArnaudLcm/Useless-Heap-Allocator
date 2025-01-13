@@ -1,6 +1,6 @@
+#include <stdalign.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <stdalign.h>
 
 #include "list.h"
 #include "types.h"
@@ -21,18 +21,19 @@
 
 #define BITMAP_SIZE ((MAX_BIN_SIZE + 7) / 8)
 
-#define ARCH_ALIGNMENT alignof(void *)
+#define ARCH_ALIGNMENT alignof(void*)
 
 typedef struct {
     void* heap_start;
     void* heap_end;
+    int heap_size;
 } heap_t;
 
 typedef struct {
     uint chunk_state : 4;
     uint chunk_size : 28;
+    struct node* free_node_ptr;
 } __attribute__((packed)) chunk_metadata_t;
-
 
 static struct node bin_nodes[MAX_BIN_SIZE] = {INIT_NODE(NULL)};
 
@@ -42,14 +43,12 @@ static struct list bin = INIT_LIST(NULL, NULL);
 
 extern heap_t heap_global;
 
-
-_Static_assert(sizeof(chunk_metadata_t) == 4,
-              "Chunk metadata size should be 4 byte long.");  // Ensure the chunk metadata is 4 byte long
+_Static_assert(sizeof(chunk_metadata_t) == 12,
+               "Chunk metadata size should be 12 byte long.");  // Ensure the chunk metadata is 12 byte long
 
 int alloc_init();
 void* alloc(ulong size);
 int resize_alloc(void* ptr, ulong new_size);
-
 
 int dealloc(void* ptr);
 
