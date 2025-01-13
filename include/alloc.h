@@ -19,8 +19,6 @@
 
 #define MAX_BIN_SIZE 128  // Maximum number of nodes in the bin
 
-#define BITMAP_SIZE ((MAX_BIN_SIZE + 7) / 8)
-
 #define ARCH_ALIGNMENT alignof(void*)
 
 typedef struct {
@@ -35,11 +33,15 @@ typedef struct {
     struct node* free_node_ptr;
 } __attribute__((packed)) chunk_metadata_t;
 
-static struct node bin_nodes[MAX_BIN_SIZE] = {INIT_NODE(NULL)};
+typedef struct {
+    int stack[MAX_BIN_SIZE];
+    int stack_top;
+    struct node bin_nodes[MAX_BIN_SIZE];
+    struct list free_list;
+} bin_t;
 
-static uchar node_bitmap[BITMAP_SIZE] = {0};
-
-static struct list bin = INIT_LIST(NULL, NULL);
+static bin_t bin = {
+    .stack = {0}, .bin_nodes = {INIT_NODE(NULL)}, .stack_top = MAX_BIN_SIZE - 1, .free_list = INIT_LIST(NULL, NULL)};
 
 extern heap_t heap_global;
 
