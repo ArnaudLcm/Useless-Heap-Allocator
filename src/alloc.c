@@ -33,7 +33,6 @@ static void free_node(struct node *n) {
     }
 }
 
-
 static void reset_nodes() {
     for (size_t i = 0; i < MAX_BIN_SIZE; i++) {
         clear_node_bit(node_bitmap, i);
@@ -62,7 +61,7 @@ static inline void *align_round_chunk(void *addr, enum RoundDirection direction)
 }
 
 int alloc_init() {
-    if(heap_global.heap_end != NULL) {
+    if (heap_global.heap_end != NULL) {
         munmap(heap_global.heap_start, heap_global.heap_size);
         heap_global.heap_start = NULL;
         heap_global.heap_end = NULL;
@@ -73,7 +72,7 @@ int alloc_init() {
         mmap((void *)sbrk(0), INIT_HEAP_SIZE, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 
     heap_global.heap_end = (void *)heap_global.heap_start + INIT_HEAP_SIZE;
-    
+
     heap_global.heap_size = INIT_HEAP_SIZE;
 
     if (heap_global.heap_start == MAP_FAILED) {
@@ -152,11 +151,11 @@ void *alloc(unsigned long size) {
     return (void *)smallest_metadata + sizeof(chunk_metadata_t);
 }
 
-static void coalesce(struct node *node) {
+static int coalesce(struct node *node) {
     chunk_metadata_t *metadata = node->data;
     chunk_metadata_t *start_metadata = metadata;
     if (!metadata) {
-        return;
+        return -1;
     }
     int total_new_chunk_size = metadata->chunk_size;
     while (metadata && metadata->chunk_state == CHUNK_FREE &&
@@ -167,16 +166,9 @@ static void coalesce(struct node *node) {
         total_new_chunk_size += metadata->chunk_size + sizeof(chunk_metadata_t);
     }
 
-    struct node *new_node = allocate_node();
-    if (new_node == NULL) {
-        return;
-    }
-
-    new_node->data = start_metadata;
-
     start_metadata->chunk_size = total_new_chunk_size;
-    start_metadata->free_node_ptr = new_node;
-    add_node(&bin, new_node);
+
+    return 0;
 }
 
 int dealloc(void *ptr) {
@@ -186,6 +178,7 @@ int dealloc(void *ptr) {
         chunk_metadata->chunk_state != CHUNK_USED) {
         return -1;
     }
+
     struct node *new_node = allocate_node();
     if (new_node == NULL) {
         return -1;
@@ -196,5 +189,8 @@ int dealloc(void *ptr) {
     new_node->data = chunk_metadata;
 
     add_node(&bin, new_node);
-    return 0;
+
+
+
+    return coalesce(new_node);
 }
