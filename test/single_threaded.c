@@ -30,9 +30,22 @@ void test_alloc_chunk_with_padding() {
     ASSERT_TRUE(((uintptr_t)second_alloc & (ARCH_ALIGNMENT - 1)) == 0);
 }
 
+void test_alloc_chunk_with_coalesce() {
+    ASSERT_TRUE(alloc_init() == 0);
+    void* new_alloc = alloc(1 << 4);
+    void* second_alloc = alloc(1 << 4);
+    void* third_alloc = alloc(1 << 4);
+    void* fourth_alloc = alloc(1 << 4);
+    ASSERT_TRUE(dealloc(third_alloc) == 0);
+    ASSERT_TRUE(dealloc(second_alloc) == 0);
+    chunk_metadata_t* second_metadata = (chunk_metadata_t*) (second_alloc - sizeof(chunk_metadata_t));
+    ASSERT_TRUE(second_metadata->chunk_size == ((1<< 4) + (1<<4) + sizeof(chunk_metadata_t)))
+}
+
 void test_single_threaded_batch() {
     test_too_large_chunk_alloc();
     test_valid_chunk_alloc();
     test_valid_chunk_alloc_and_dealloc();
     test_alloc_chunk_with_padding();
+    test_alloc_chunk_with_coalesce();
 }

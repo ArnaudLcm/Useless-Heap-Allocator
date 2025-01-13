@@ -1,5 +1,6 @@
 #include "alloc.h"
 
+#include <stddef.h>
 #include <sys/mman.h>
 
 #include "list.h"
@@ -27,7 +28,7 @@ static struct node *allocate_node() {
 }
 
 static void free_node(struct node *n) {
-    int index = n - bin_nodes;  // Calculate index of the node in the array
+    int index = (ptrdiff_t)n - (ptrdiff_t)bin_nodes;  // Calculate index of the node in the array
     if (index >= 0 && index < MAX_BIN_SIZE) {
         clear_node_bit(node_bitmap, index);  // Mark as free
     }
@@ -151,19 +152,23 @@ void *alloc(unsigned long size) {
     return (void *)smallest_metadata + sizeof(chunk_metadata_t);
 }
 
+/**
+ * @brief: Merge free chunks
+ */
 static int coalesce(struct node *node) {
-    chunk_metadata_t *metadata = node->data;
-    chunk_metadata_t *start_metadata = metadata;
-    if (!metadata) {
+    chunk_metadata_t *start_metadata = node->data;
+    if (!start_metadata) {
         return -1;
     }
-    int total_new_chunk_size = metadata->chunk_size;
-    while (metadata && metadata->chunk_state == CHUNK_FREE &&
-           ((void *)metadata + metadata->chunk_size + sizeof(chunk_metadata_t) < heap_global.heap_end)) {
-        remove_node(&bin, metadata->free_node_ptr);
-        free_node(metadata->free_node_ptr);
-        metadata = (void *)metadata + metadata->chunk_size + sizeof(chunk_metadata_t);
-        total_new_chunk_size += metadata->chunk_size + sizeof(chunk_metadata_t);
+    chunk_metadata_t *next_metadata =
+        (chunk_metadata_t *)((void *)start_metadata + start_metadata->chunk_size + sizeof(chunk_metadata_t));
+
+    int total_new_chunk_size = start_metadata->chunk_size;
+    while ((void *)next_metadata < heap_global.heap_end  && next_metadata && next_metadata->chunk_state == CHUNK_FREE) {
+        total_new_chunk_size += next_metadata->chunk_size + sizeof(chunk_metadata_t);
+        remove_node(&bin, next_metadata->free_node_ptr);
+        free_node(next_metadata->free_node_ptr);
+        next_metadata = (void*)next_metadata + next_metadata->chunk_size + sizeof(chunk_metadata_t);
     }
 
     start_metadata->chunk_size = total_new_chunk_size;
@@ -189,8 +194,6 @@ int dealloc(void *ptr) {
     new_node->data = chunk_metadata;
 
     add_node(&bin, new_node);
-
-
 
     return coalesce(new_node);
 }
