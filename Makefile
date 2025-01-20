@@ -8,8 +8,8 @@ FLAGS=
 BUILD_DIR=build
 CFLAGS= -fPIC -g -pthread -std=gnu99
 DEBUGFLAGS=-O0 -D _DEBUG -g
-LDFLAGS= -shared -latomic
-TEST_LDFLAGS= -L. $(BUILD_DIR)/alloc.so -latomic
+LDFLAGS= -shared
+TEST_LDFLAGS= -L. $(BUILD_DIR)/alloc.so
 DEP=.dependencies
 
 TARGET=alloc.so

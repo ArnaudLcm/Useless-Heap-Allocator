@@ -9,7 +9,6 @@
 #include "list.h"
 #include "log.h"
 
-heap_t heap_global = {.heap_end = NULL, .heap_start = NULL, .heap_size = 0};
 
 enum RoundDirection { ROUND_UP, ROUND_DOWN };
 
@@ -64,42 +63,41 @@ static inline void *align_round_chunk(void *addr, enum RoundDirection direction)
 }
 
 int alloc_init() {
-    if (heap_global.heap_end != NULL) {
-        munmap(heap_global.heap_start, heap_global.heap_size);
-        heap_global.heap_start = NULL;
-        heap_global.heap_end = NULL;
+    if (global_arena.arena_end != NULL) {
+        munmap(global_arena.arena_start, global_arena.arena_size);
+        global_arena.arena_start = NULL;
+        global_arena.arena_end = NULL;
     }
-    pthread_mutex_init(&heap_global.mutex, NULL);
 
-    heap_global.heap_start =
+    global_arena.arena_start =
         mmap((void *)sbrk(0), INIT_HEAP_SIZE, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 
-    if (heap_global.heap_start == MAP_FAILED) {
+    if (global_arena.arena_start == MAP_FAILED) {
         return -1;
     }
 
-    heap_global.heap_end = (void *)heap_global.heap_start + INIT_HEAP_SIZE;
+    global_arena.arena_end = (void *)global_arena.arena_start + INIT_HEAP_SIZE;
 
-    heap_global.heap_size = INIT_HEAP_SIZE;
+    global_arena.arena_size = INIT_HEAP_SIZE;
 
-    heap_global.heap_start = align_round_chunk(heap_global.heap_start, ROUND_UP);
+    global_arena.arena_start = align_round_chunk(global_arena.arena_start, ROUND_UP);
 
     // Init free nodes stacks
-    RESET_BIN_POOL();
+    reset_bin(&global_arena);
 
-    struct node *first_node = stack_pop(&bin_pool[2]);
+    struct node *first_node = stack_pop(&global_arena.bin_pool[2]);
 
     if (!first_node) return -1;  // No available nodes. This should not happen.
 
-    first_node->data = heap_global.heap_start;
+    first_node->data = global_arena.arena_start;
 
-    add_node(&bin_pool[2].free_list, first_node);
+    add_node(&global_arena.bin_pool[2].free_list, first_node);
 
-    chunk_metadata_t *c = heap_global.heap_start;
+    chunk_metadata_t *c = global_arena.arena_start;
     c->chunk_state = CHUNK_FREE;
-    c->chunk_size = heap_global.heap_end - heap_global.heap_start - sizeof(chunk_metadata_t);
+    c->chunk_size = global_arena.arena_end - global_arena.arena_start - sizeof(chunk_metadata_t);
 
-    log_debug("Initialized heap with size %d at start %p", c->chunk_size, heap_global.heap_start);
+    log_debug("Initialized heap with size %d at start %p", c->chunk_size, global_arena.arena_start);
     return 0;
 }
 
@@ -111,10 +109,10 @@ static int shrink_chunk(chunk_metadata_t *metadata, ulong total_size, bin_t *bin
         new_metadata->chunk_state = CHUNK_FREE;
 
         int receiver_bin_index = get_bin_index_from_size(remaining_size - sizeof(chunk_metadata_t));
-        bin_t *receiver_bin = &bin_pool[receiver_bin_index];
+        bin_t *receiver_bin = &global_arena.bin_pool[receiver_bin_index];
 
         if (receiver_bin->stack_top < 0) {
-            receiver_bin = &bin_pool[2];
+            receiver_bin = &global_arena.bin_pool[2];
         }
 
         struct node *new_node = stack_pop(receiver_bin);
@@ -130,7 +128,6 @@ static int shrink_chunk(chunk_metadata_t *metadata, ulong total_size, bin_t *bin
 }
 
 void *alloc(unsigned long size) {
-    pthread_mutex_lock(&heap_global.mutex);
     size = (size + ARCH_ALIGNMENT - 1) & ~(ARCH_ALIGNMENT - 1);
 
     if (size > MAX_CHUNK_SIZE) {
@@ -140,11 +137,11 @@ void *alloc(unsigned long size) {
     // Find the appropriate bin to handle the user request (i.e small, medium or unsorted bins)
     int bin_index = get_bin_index_from_size(size);
 
-    if (bin_pool[bin_index].stack_top < 0) {  // Case where the appropriate bin is empty (i.e no free chunk availble)
+    if (global_arena.bin_pool[bin_index].stack_top < 0) {  // Case where the appropriate bin is empty (i.e no free chunk availble)
         bin_index = 2;
     }
 
-    bin_t *bin = &bin_pool[bin_index];
+    bin_t *bin = &global_arena.bin_pool[bin_index];
 
     // Find the smallest suitable free node in case of unsorted bin, otherwise take the first free node
     struct node *smallest_free_node = NULL;
@@ -178,7 +175,6 @@ void *alloc(unsigned long size) {
     }
 
     smallest_metadata->chunk_size = size;
-    pthread_mutex_unlock(&heap_global.mutex);
 
     return (void *)smallest_metadata + sizeof(chunk_metadata_t);
 }
@@ -195,12 +191,12 @@ static int coalesce(struct node *node) {
         (chunk_metadata_t *)((void *)start_metadata + start_metadata->chunk_size + sizeof(chunk_metadata_t));
 
     int total_new_chunk_size = start_metadata->chunk_size;
-    while ((void *)next_metadata < heap_global.heap_end && next_metadata && next_metadata->chunk_state == CHUNK_FREE) {
+    while ((void *)next_metadata < global_arena.arena_end && next_metadata && next_metadata->chunk_state == CHUNK_FREE) {
         total_new_chunk_size += next_metadata->chunk_size + sizeof(chunk_metadata_t);
 
         int owner_bin_index = get_bin_index_from_size(next_metadata->chunk_size);
 
-        bin_t *owner_bin = &bin_pool[owner_bin_index];
+        bin_t *owner_bin = &global_arena.bin_pool[owner_bin_index];
 
         remove_node(&owner_bin->free_list, next_metadata->free_node_ptr);
         stack_push(next_metadata->free_node_ptr, owner_bin);
@@ -208,28 +204,26 @@ static int coalesce(struct node *node) {
     }
 
     start_metadata->chunk_size = total_new_chunk_size;
-    pthread_mutex_unlock(&heap_global.mutex);
     return 0;
 }
 
 int dealloc(void *ptr) {
-    pthread_mutex_lock(&heap_global.mutex);
     chunk_metadata_t *chunk_metadata = ptr - sizeof(chunk_metadata_t);
 
-    if (!ptr || (void *)chunk_metadata > heap_global.heap_end || (void *)chunk_metadata < heap_global.heap_start ||
+    if (!ptr || (void *)chunk_metadata > global_arena.arena_end || (void *)chunk_metadata < global_arena.arena_start ||
         chunk_metadata->chunk_state != CHUNK_USED) {
         return -1;
     }
 
     int bin_index = get_bin_index_from_size(chunk_metadata->chunk_size);
 
-    bin_t *bin = &bin_pool[bin_index];
+    bin_t *bin = &global_arena.bin_pool[bin_index];
 
     while (bin->stack_top < 0) {  // if the sorted bin is full, default to the unsorted one
         bin_index = 2;
     }
 
-    bin = &bin_pool[bin_index];
+    bin = &global_arena.bin_pool[bin_index];
 
     struct node *new_node = stack_pop(bin);
     if (new_node == NULL) {
@@ -270,12 +264,12 @@ void *resize_alloc(void *ptr, ulong new_size) {
         // Find the appropriate bin to handle the user request (i.e small, medium or unsorted bins)
         int bin_index = get_bin_index_from_size(new_size);
 
-        if (bin_pool[bin_index].stack_top <
+        if (global_arena.bin_pool[bin_index].stack_top <
             0) {  // Case where the appropriate bin is empty (i.e no free chunk availble)
             bin_index = 2;
         }
 
-        bin_t *bin = &bin_pool[bin_index];
+        bin_t *bin = &global_arena.bin_pool[bin_index];
 
         remove_node(&bin->free_list, chunk_metadata->free_node_ptr);
         stack_push(chunk_metadata->free_node_ptr, bin);

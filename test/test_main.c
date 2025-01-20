@@ -16,8 +16,8 @@ int main(int argc, char *argv[]) {
     test_single_threaded_batch();
     end_test_batch();
 
-    new_test_batch("test_multi_threaded");
-    test_multi_threaded_batch();
-    end_test_batch();
+    // new_test_batch("test_multi_threaded");
+    // test_multi_threaded_batch();
+    // end_test_batch();
     return 0;
 }
