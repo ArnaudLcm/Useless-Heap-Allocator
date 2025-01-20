@@ -1,5 +1,5 @@
 .SUFFIXES:
-.PHONY: all clean gdb build_dir test
+.PHONY: all clean gdb build_dir test massif
 all: build_dir $(TARGET)
 
 SHELL=/bin/sh
@@ -19,6 +19,8 @@ HEADERS=$(wildcard include/*.h)
 OBJECTS=$(addprefix $(BUILD_DIR)/, $(notdir $(SOURCES:.c=.o)))
 TEST_OBJECTS=$(addprefix $(BUILD_DIR)/, $(notdir $(TEST_SOURCES:.c=.o)))
 DEPFILES=$(addprefix $(DEP)/, $(notdir $(SOURCES:.c=.d)))
+
+MASSIF_OUTPUT_FILE=massif_output.out
 
 all: build_dir $(TARGET)
 
@@ -48,4 +50,8 @@ debug: $(TARGET) $(TEST_OBJECTS)
 	@gdb $(BUILD_DIR)/test_executable
 	
 valgrind: $(TARGET) $(TEST_OBJECTS)
-	@valgrind $(BUILD_DIR)/test_executable
+	@valgrind ./$(BUILD_DIR)/test_executable
+
+massif: $(TARGET) $(TEST_OBJECTS)
+	@valgrind --tool=massif --time-unit=ms --detailed-freq=10 --massif-out-file=$(MASSIF_OUTPUT_FILE) ./$(BUILD_DIR)/test_executable
+	@ms_print $(MASSIF_OUTPUT_FILE)
