@@ -64,7 +64,7 @@ _Static_assert(sizeof(chunk_metadata_t) == 12,
 
 int alloc_init();
 void* alloc(ulong size);
-int resize_alloc(void* ptr, ulong new_size);
+void* resize_alloc(void* ptr, ulong new_size);
 
 int dealloc(void* ptr);
 

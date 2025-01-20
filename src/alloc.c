@@ -2,6 +2,7 @@
 
 #include <pthread.h>
 #include <stddef.h>
+#include <string.h>
 #include <sys/mman.h>
 #include <sys/types.h>
 
@@ -102,6 +103,32 @@ int alloc_init() {
     return 0;
 }
 
+static int shrink_chunk(chunk_metadata_t *metadata, ulong total_size, bin_t *bin) {
+    unsigned long remaining_size = metadata->chunk_size - total_size - sizeof(chunk_metadata_t);
+    if (remaining_size > sizeof(chunk_metadata_t)) {
+        chunk_metadata_t *new_metadata = (void *)metadata + total_size + sizeof(chunk_metadata_t);
+        new_metadata->chunk_size = remaining_size;
+        new_metadata->chunk_state = CHUNK_FREE;
+
+        int receiver_bin_index = get_bin_index_from_size(remaining_size - sizeof(chunk_metadata_t));
+        bin_t *receiver_bin = &bin_pool[receiver_bin_index];
+
+        if (receiver_bin->stack_top < 0) {
+            receiver_bin = &bin_pool[2];
+        }
+
+        struct node *new_node = stack_pop(receiver_bin);
+        if (!new_node) {
+            return -1;
+        }
+        new_node->data = new_metadata;
+        add_node(&bin->free_list, new_node);
+        new_metadata->free_node_ptr = new_node;
+    }
+
+    return 0;
+}
+
 void *alloc(unsigned long size) {
     pthread_mutex_lock(&heap_global.mutex);
     size = (size + ARCH_ALIGNMENT - 1) & ~(ARCH_ALIGNMENT - 1);
@@ -145,26 +172,8 @@ void *alloc(unsigned long size) {
 
     if (bin_index == 2) {  // Case: Unsorted bin
         // Check if splitting the chunk is necessary
-        unsigned long remaining_size = smallest_metadata->chunk_size - size - sizeof(chunk_metadata_t);
-        if (remaining_size > sizeof(chunk_metadata_t)) {
-            chunk_metadata_t *new_metadata = (void *)smallest_metadata + size + sizeof(chunk_metadata_t);
-            new_metadata->chunk_size = remaining_size;
-            new_metadata->chunk_state = CHUNK_FREE;
-
-            int receiver_bin_index = get_bin_index_from_size(remaining_size - sizeof(chunk_metadata_t));
-            bin_t *receiver_bin = &bin_pool[receiver_bin_index];
-
-            if (receiver_bin->stack_top < 0) {
-                receiver_bin = &bin_pool[2];
-            }
-
-            struct node *new_node = stack_pop(receiver_bin);
-            if (!new_node) {
-                return NULL;
-            }
-            new_node->data = new_metadata;
-            add_node(&bin->free_list, new_node);
-            new_metadata->free_node_ptr = new_node;
+        if (shrink_chunk(smallest_metadata, size, bin) < 0) {
+            return NULL;
         }
     }
 
@@ -234,4 +243,67 @@ int dealloc(void *ptr) {
     add_node(&bin->free_list, new_node);
 
     return coalesce(new_node);
+}
+
+void *resize_alloc(void *ptr, ulong new_size) {
+    if (ptr == NULL) {
+        return NULL;
+    }
+
+    if (new_size == 0) {
+        dealloc(ptr);
+        return NULL;
+    }
+
+    chunk_metadata_t *chunk_metadata = ptr - sizeof(chunk_metadata_t);
+    chunk_metadata_t *next_chunk_metadata = ptr + chunk_metadata->chunk_size;
+    int curr_size = chunk_metadata->chunk_size;
+
+    // First case: Try to resize in place
+    while (curr_size < new_size && next_chunk_metadata->chunk_state == CHUNK_FREE) {
+        curr_size += next_chunk_metadata->chunk_size;
+        next_chunk_metadata = next_chunk_metadata + next_chunk_metadata->chunk_size;
+    }
+
+    if (curr_size >= new_size) {  // We can resize in place
+        dealloc(ptr);             // We set the node to free and coalesce
+        // Find the appropriate bin to handle the user request (i.e small, medium or unsorted bins)
+        int bin_index = get_bin_index_from_size(new_size);
+
+        if (bin_pool[bin_index].stack_top <
+            0) {  // Case where the appropriate bin is empty (i.e no free chunk availble)
+            bin_index = 2;
+        }
+
+        bin_t *bin = &bin_pool[bin_index];
+
+        remove_node(&bin->free_list, chunk_metadata->free_node_ptr);
+        stack_push(chunk_metadata->free_node_ptr, bin);
+        chunk_metadata->free_node_ptr = NULL;
+
+        chunk_metadata->chunk_state = CHUNK_USED;
+
+        // Check if splitting the chunk is necessary
+        if (shrink_chunk(chunk_metadata, new_size, bin) < 0) {
+            return NULL;
+        }
+
+        chunk_metadata->chunk_size = new_size;
+
+        return (void *)chunk_metadata + sizeof(chunk_metadata_t);
+    }
+
+    // We need to copy the content of the node
+
+    void* new_alloc = alloc(new_size);
+
+    if(new_alloc == NULL) { // Allocation failed
+        return NULL;
+    }
+
+    memcpy(new_alloc, ptr, chunk_metadata->chunk_size);
+
+    dealloc(ptr);
+
+    return new_alloc;
 }
