@@ -30,6 +30,9 @@ Simple implementation of a heap allocator.
 
 
 ### Notes - Features I could implement
+
 *List of features I could consider to improve the current state of the allocator*:
+
 - Use XOR linked lists
 - Like GLibC allocator, have 128 bins with 64 small bins, 63 large bins and 1 unsorted bin
+- Add the concept of arenas to handle multi threaded contexts

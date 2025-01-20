@@ -7,9 +7,11 @@ void test_too_large_chunk_alloc() { ASSERT_TRUE(alloc(1 << 29) == NULL); }
 
 void test_valid_chunk_alloc() {
     ASSERT_TRUE(alloc_init() == 0);
-    ASSERT_TRUE(alloc(1 << 4) == heap_global.heap_start + sizeof(chunk_metadata_t));
+    void* first_alloc = alloc(1 << 4);
+    ASSERT_TRUE(first_alloc == heap_global.heap_start + sizeof(chunk_metadata_t));
 
     void* new_alloc = alloc(1 << 4);
+
     ASSERT_TRUE(new_alloc == heap_global.heap_start + sizeof(chunk_metadata_t) + (1 << 4) + sizeof(chunk_metadata_t));
 }
 
@@ -19,7 +21,6 @@ void test_valid_chunk_alloc_and_dealloc() {
     void* new_alloc = alloc(1 << 4);
 
     ASSERT_TRUE(dealloc(new_alloc) == 0);
-
     ASSERT_TRUE(dealloc(new_alloc) == -1);  // Check that we can't double free
 }
 

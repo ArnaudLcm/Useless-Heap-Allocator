@@ -2,6 +2,7 @@
 
 #include <stddef.h>
 #include <sys/mman.h>
+#include <sys/types.h>
 
 #include "list.h"
 #include "log.h"
@@ -10,34 +11,36 @@ heap_t heap_global = {.heap_end = NULL, .heap_start = NULL, .heap_size = 0};
 
 enum RoundDirection { ROUND_UP, ROUND_DOWN };
 
-void node_pop() {}
+static int get_bin_index_from_size(ulong size) {
+    switch (size) {
+        case 512:
+            return 0;
+        case 1024:
+            return 1;
+        default:
+            return 2;
+    }
+}
 
-static struct node *allocate_node() {
-    if (bin.stack_top < 0) {
+static struct node *stack_pop(bin_t *bin) {
+    if (bin->stack_top < 0) {
         return NULL;  // No free node available
     }
-    int index = bin.stack[bin.stack_top--];
-    if(index >= 0 && index < MAX_BIN_SIZE) {
-        return &bin.bin_nodes[index];
+    int index = bin->stack[bin->stack_top--];
+    if (index >= 0 && index < MAX_BIN_SIZE) {
+        return &bin->bin_nodes[index];
     }
 
     return NULL;
 }
 
-static void free_node(struct node *n) {
-    int index = ((ptrdiff_t)n - (ptrdiff_t)bin.bin_nodes)/(sizeof(struct node));  // Calculate index of the node in the array
+static void stack_push(struct node *n, bin_t *bin) {
+    int index =
+        ((ptrdiff_t)n - (ptrdiff_t)bin->bin_nodes) / (sizeof(struct node));  // Calculate index of the node in the array
     if (index >= 0 && index < MAX_BIN_SIZE) {
-        bin.stack[++bin.stack_top] = index;
+        bin->stack[++bin->stack_top] = index;
     }
 }
-
-static void setup_nodes_stack() {
-    for (size_t i = 0; i < MAX_BIN_SIZE; i++) {
-        bin.stack[i] = i;
-    }
-    bin.stack_top = MAX_BIN_SIZE - 1;
-}
-
 /*
  * @brief: This function will ensure every chunks are 4 byte aligned. By default, round it up
  */
@@ -63,7 +66,6 @@ int alloc_init() {
         munmap(heap_global.heap_start, heap_global.heap_size);
         heap_global.heap_start = NULL;
         heap_global.heap_end = NULL;
-        setup_nodes_stack();
     }
 
     heap_global.heap_start =
@@ -79,18 +81,16 @@ int alloc_init() {
 
     heap_global.heap_start = align_round_chunk(heap_global.heap_start, ROUND_UP);
 
-    struct node *first_node = allocate_node();
+    // Init free nodes stacks
+    RESET_BIN_POOL();
 
-    if (!first_node) {
-        return -1;  // No available nodes. This should not happen.
-    }
+    struct node *first_node = stack_pop(&bin_pool[2]);
 
-    // Init the free nodes stack
-    setup_nodes_stack();
+    if (!first_node) return -1;  // No available nodes. This should not happen.
 
     first_node->data = heap_global.heap_start;
 
-    add_node(&bin.free_list, first_node);
+    add_node(&bin_pool[2].free_list, first_node);
 
     chunk_metadata_t *c = heap_global.heap_start;
     c->chunk_state = CHUNK_FREE;
@@ -107,11 +107,20 @@ void *alloc(unsigned long size) {
         return NULL;
     }
 
-    // Find the smallest suitable free node
+    // Find the appropriate bin to handle the user request (i.e small, medium or unsorted bins)
+    int bin_index = get_bin_index_from_size(size);
+
+    if (bin_pool[bin_index].stack_top < 0) {  // Case where the appropriate bin is empty (i.e no free chunk availble)
+        bin_index = 2;
+    }
+
+    bin_t *bin = &bin_pool[bin_index];
+
+    // Find the smallest suitable free node in case of unsorted bin, otherwise take the first free node
     struct node *smallest_free_node = NULL;
     chunk_metadata_t *smallest_metadata = NULL;
 
-    for (struct node *current = bin.free_list.head; current; current = current->next) {
+    for (struct node *current = bin->free_list.head; current; current = current->next) {
         chunk_metadata_t *metadata = current->data;
         if (metadata && metadata->chunk_size >= size) {
             if (!smallest_free_node || metadata->chunk_size < smallest_metadata->chunk_size) {
@@ -125,26 +134,35 @@ void *alloc(unsigned long size) {
         return NULL;  // No suitable chunk found
     }
 
-    remove_node(&bin.free_list, smallest_free_node);
-    free_node(smallest_free_node);
+    remove_node(&bin->free_list, smallest_free_node);
+    stack_push(smallest_free_node, bin);
     smallest_metadata->free_node_ptr = NULL;
 
     smallest_metadata->chunk_state = CHUNK_USED;
 
-    // Check if splitting the chunk is necessary
-    unsigned long remaining_size = smallest_metadata->chunk_size - size - sizeof(chunk_metadata_t);
-    if (remaining_size > sizeof(chunk_metadata_t)) {
-        chunk_metadata_t *new_metadata = (void *)smallest_metadata + size + sizeof(chunk_metadata_t);
-        new_metadata->chunk_size = remaining_size;
-        new_metadata->chunk_state = CHUNK_FREE;
+    if (bin_index == 2) {  // Case: Unsorted bin
+        // Check if splitting the chunk is necessary
+        unsigned long remaining_size = smallest_metadata->chunk_size - size - sizeof(chunk_metadata_t);
+        if (remaining_size > sizeof(chunk_metadata_t)) {
+            chunk_metadata_t *new_metadata = (void *)smallest_metadata + size + sizeof(chunk_metadata_t);
+            new_metadata->chunk_size = remaining_size;
+            new_metadata->chunk_state = CHUNK_FREE;
 
-        struct node *new_node = allocate_node();
-        if (!new_node) {
-            return NULL;
+            int receiver_bin_index = get_bin_index_from_size(remaining_size - sizeof(chunk_metadata_t));
+            bin_t *receiver_bin = &bin_pool[receiver_bin_index];
+
+            if (receiver_bin->stack_top < 0) {
+                receiver_bin = &bin_pool[2];
+            }
+
+            struct node *new_node = stack_pop(receiver_bin);
+            if (!new_node) {
+                return NULL;
+            }
+            new_node->data = new_metadata;
+            add_node(&bin->free_list, new_node);
+            new_metadata->free_node_ptr = new_node;
         }
-        new_node->data = new_metadata;
-        add_node(&bin.free_list, new_node);
-        new_metadata->free_node_ptr = new_node;
     }
 
     smallest_metadata->chunk_size = size;
@@ -166,8 +184,13 @@ static int coalesce(struct node *node) {
     int total_new_chunk_size = start_metadata->chunk_size;
     while ((void *)next_metadata < heap_global.heap_end && next_metadata && next_metadata->chunk_state == CHUNK_FREE) {
         total_new_chunk_size += next_metadata->chunk_size + sizeof(chunk_metadata_t);
-        remove_node(&bin.free_list, next_metadata->free_node_ptr);
-        free_node(next_metadata->free_node_ptr);
+
+        int owner_bin_index = get_bin_index_from_size(next_metadata->chunk_size);
+
+        bin_t *owner_bin = &bin_pool[owner_bin_index];
+
+        remove_node(&owner_bin->free_list, next_metadata->free_node_ptr);
+        stack_push(next_metadata->free_node_ptr, owner_bin);
         next_metadata = (void *)next_metadata + next_metadata->chunk_size + sizeof(chunk_metadata_t);
     }
 
@@ -184,7 +207,17 @@ int dealloc(void *ptr) {
         return -1;
     }
 
-    struct node *new_node = allocate_node();
+    int bin_index = get_bin_index_from_size(chunk_metadata->chunk_size);
+
+    bin_t *bin = &bin_pool[bin_index];
+
+    while (bin->stack_top < 0) {  // if the sorted bin is full, default to the unsorted one
+        bin_index = 2;
+    }
+
+    bin = &bin_pool[bin_index];
+
+    struct node *new_node = stack_pop(bin);
     if (new_node == NULL) {
         return -1;
     }
@@ -193,7 +226,7 @@ int dealloc(void *ptr) {
     chunk_metadata->free_node_ptr = new_node;
     new_node->data = chunk_metadata;
 
-    add_node(&bin.free_list, new_node);
+    add_node(&bin->free_list, new_node);
 
     return coalesce(new_node);
 }

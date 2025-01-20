@@ -15,7 +15,7 @@
 
 #define INIT_HEAP_SIZE 0x1000
 
-#define MAX_CHUNK_SIZE ((1 << 28) / 8)
+#define MAX_CHUNK_SIZE ((1 << 28) / 8) // Related to the chunk size definition in chunk_metadata_t
 
 #define MAX_BIN_SIZE 128  // Maximum number of nodes in the bin
 
@@ -40,8 +40,20 @@ typedef struct {
     struct list free_list;
 } bin_t;
 
-static bin_t bin = {
-    .stack = {0}, .bin_nodes = {INIT_NODE(NULL)}, .stack_top = MAX_BIN_SIZE - 1, .free_list = INIT_LIST(NULL, NULL)};
+#define POOL_BIN_SIZE 3
+
+#define RESET_BIN_POOL() \
+    do { \
+        for (int i = 0; i < POOL_BIN_SIZE; i++) { \
+            bin_pool[i] = (bin_t){ .stack = {0}, .bin_nodes = {INIT_NODE(NULL)}, .stack_top = MAX_BIN_SIZE - 1, .free_list = INIT_LIST(NULL, NULL) }; \
+        } \
+    } while (0)
+
+static bin_t bin_pool[POOL_BIN_SIZE] = {
+    { .stack = {0}, .bin_nodes = {INIT_NODE(NULL)}, .stack_top = MAX_BIN_SIZE - 1, .free_list = INIT_LIST(NULL, NULL) },
+    { .stack = {0}, .bin_nodes = {INIT_NODE(NULL)}, .stack_top = MAX_BIN_SIZE - 1, .free_list = INIT_LIST(NULL, NULL) },
+    { .stack = {0}, .bin_nodes = {INIT_NODE(NULL)}, .stack_top = MAX_BIN_SIZE - 1, .free_list = INIT_LIST(NULL, NULL) }
+};
 
 extern heap_t heap_global;
 
