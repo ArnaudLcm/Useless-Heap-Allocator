@@ -24,15 +24,42 @@ void test_valid_chunk_alloc_and_dealloc() {
     ASSERT_TRUE(dealloc(new_alloc) == -1);  // Check that we can't double free
 }
 
-void test_valid_chunk_alloc_and_resize() {
+void test_valid_chunk_alloc_and_resize_in_place() {
     ASSERT_TRUE(alloc_init() == 0);
 
-    void* new_alloc = alloc(1 << 4);
+    int* new_alloc = alloc(1 << 4);
+
+    *new_alloc = 1234;
 
     ASSERT_TRUE(new_alloc != NULL);
-    void* realloc = resize_alloc(new_alloc, 1 << 8);
+    int* realloc = (int*)resize_alloc(new_alloc, 1 << 8);
     ASSERT_TRUE(new_alloc == realloc); // Check we did a resize in place
+    ASSERT_TRUE(*new_alloc == *realloc);
 }
+
+
+void test_valid_chunk_alloc_and_resize_with_copy() {
+    ASSERT_TRUE(alloc_init() == 0);
+
+    int* new_alloc = (int*)alloc(1 << 4);
+
+    *new_alloc = 1234;
+
+    int* second_alloc = (int*)alloc(1 << 4);
+
+    *second_alloc = 1234; 
+
+    int* third_alloc = alloc(1 << 4);
+
+
+    ASSERT_TRUE(new_alloc != NULL);
+    ASSERT_TRUE(second_alloc != NULL);
+    ASSERT_TRUE(third_alloc != NULL);
+    int* realloc = (int*)resize_alloc(second_alloc, 1 << 8);
+    ASSERT_TRUE(new_alloc != realloc); // Check we have not done a resize in place
+    ASSERT_TRUE(*new_alloc == *realloc);
+}
+
 
 void test_alloc_chunk_with_padding() {
     ASSERT_TRUE(alloc_init() == 0);
@@ -59,5 +86,6 @@ void test_single_threaded_batch() {
     test_valid_chunk_alloc_and_dealloc();
     test_alloc_chunk_with_padding();
     test_alloc_chunk_with_coalesce();
-    test_valid_chunk_alloc_and_resize();
+    test_valid_chunk_alloc_and_resize_in_place();
+    test_valid_chunk_alloc_and_resize_with_copy();
 }
