@@ -1,3 +1,4 @@
+#include <pthread.h>
 #include <stdalign.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -25,6 +26,7 @@ typedef struct {
     void* heap_start;
     void* heap_end;
     int heap_size;
+    pthread_mutex_t mutex;
 } heap_t;
 
 typedef struct {

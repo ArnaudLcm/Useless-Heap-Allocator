@@ -1,5 +1,6 @@
 #include "alloc.h"
 
+#include <pthread.h>
 #include <stddef.h>
 #include <sys/mman.h>
 #include <sys/types.h>
@@ -67,6 +68,7 @@ int alloc_init() {
         heap_global.heap_start = NULL;
         heap_global.heap_end = NULL;
     }
+    pthread_mutex_init(&heap_global.mutex, NULL);
 
     heap_global.heap_start =
         mmap((void *)sbrk(0), INIT_HEAP_SIZE, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
@@ -101,6 +103,7 @@ int alloc_init() {
 }
 
 void *alloc(unsigned long size) {
+    pthread_mutex_lock(&heap_global.mutex);
     size = (size + ARCH_ALIGNMENT - 1) & ~(ARCH_ALIGNMENT - 1);
 
     if (size > MAX_CHUNK_SIZE) {
@@ -166,6 +169,7 @@ void *alloc(unsigned long size) {
     }
 
     smallest_metadata->chunk_size = size;
+    pthread_mutex_unlock(&heap_global.mutex);
 
     return (void *)smallest_metadata + sizeof(chunk_metadata_t);
 }
@@ -195,11 +199,12 @@ static int coalesce(struct node *node) {
     }
 
     start_metadata->chunk_size = total_new_chunk_size;
-
+    pthread_mutex_unlock(&heap_global.mutex);
     return 0;
 }
 
 int dealloc(void *ptr) {
+    pthread_mutex_lock(&heap_global.mutex);
     chunk_metadata_t *chunk_metadata = ptr - sizeof(chunk_metadata_t);
 
     if (!ptr || (void *)chunk_metadata > heap_global.heap_end || (void *)chunk_metadata < heap_global.heap_start ||
