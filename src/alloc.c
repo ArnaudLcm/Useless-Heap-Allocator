@@ -142,7 +142,9 @@ static void *alloc_with_arena(unsigned long size, arena_t *arena) {
 }
 
 static void *alloc_local_arena() {
+    pthread_mutex_lock(&global_arena.mutex);
     local_arena = (arena_t *)alloc_with_arena(ARENA_SIZE, &global_arena);
+    pthread_mutex_unlock(&global_arena.mutex);
     if (local_arena != NULL && init_arena(local_arena, ARENA_SIZE, (void*)local_arena + sizeof(arena_t)) == 0) {
         return local_arena;
     }
@@ -152,7 +154,7 @@ static void *alloc_local_arena() {
 void *alloc(unsigned long size) {
     if (global_arena.arena_start == NULL) {  // Heap was not initialized
         return NULL;
-    }
+    }  
 
     if (local_arena == NULL && alloc_local_arena() == NULL) {
         return NULL;

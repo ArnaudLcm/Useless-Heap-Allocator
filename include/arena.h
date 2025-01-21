@@ -1,3 +1,4 @@
+#include <pthread.h>
 #include <sys/types.h>
 
 #include "bin.h"
@@ -12,6 +13,7 @@ typedef struct {
     void* arena_end;
     int arena_size;
     bin_t bin_pool[POOL_BIN_SIZE];
+    pthread_mutex_t mutex; // This mutex is used by the global arena to ensure safe arena allocation 
 } arena_t;
 
 _Static_assert(ARENA_SIZE > sizeof(arena_t), "Default arena size can't be smaller than the arena struct.");

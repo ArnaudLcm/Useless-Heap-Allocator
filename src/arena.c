@@ -1,6 +1,7 @@
 #include "arena.h"
 #include "alloc.h"
 #include "stack.h"
+#include <pthread.h>
 #include <stdlib.h>
 
 #include "bin.h"
@@ -51,6 +52,10 @@ int init_arena(arena_t* arena, ulong arena_size, void* start_addr) {
     c->chunk_state = CHUNK_FREE;
     c->chunk_size = arena->arena_end - arena->arena_start - sizeof(chunk_metadata_t);
 
+
+    if(arena == &global_arena) {
+        pthread_mutex_init(&global_arena.mutex, NULL);
+    }
 
     return 0;
 }
