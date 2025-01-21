@@ -1,13 +1,51 @@
-# Multi-threaded heap allocator
+<div align='center'>
 
-Simple implementation of a heap allocator.
+  <h1>Useless Heap Allocator</h1>
+  <p>A fairly simple heap allocator.</p>
 
-### Limitations
-- Max number of threads: 128
+<h4>
+  
+  <span> · </span> <a href="https://github.com/ArnaudLcm/Useless-Heap-Allocator/issues"> Report Bug </a>
+  <span> · </span> <a href="https://github.com/ArnaudLcm/Useless-Heap-Allocator/issues"> Request Feature </a>
+   · 
+</h4>
+</div>
 
-### Requirements
-- GCC
+## About
 
+The goal of this project is to implement a simple heap allocator designed for concurrent use with multiple threads. To avoid relying on a global mutex, it uses **arenas** to handle allocations efficiently in a multi-threaded environment.
+
+
+**Current limitations:**
+- Max number of threads (if heap size is enough): 128
+
+
+> [!CAUTION]
+> There is currently no mechanism to avoid heap overflow. 
+
+> [!WARNING]
+> This is not a production ready library. Use it at your own risk.
+
+## Getting Started
+
+### Dependencies
+- GCC 5.x or newer 
+- Make
+
+### Build the library
+
+To build the library, please execute:
+```bash
+make
+```
+
+## Features
+ - Use arenas to handle multi-threaded allocations.
+ - Use sbrk and mmap syscalls to setup the initial heap.
+ - Use stacks to have O(1) access to free nodes.
+ - Usage of 3 different bin type (small, medium and unsorted) to improve memory allocation efficiency.
+
+## Notes
 
 ### Notes - Design
 *Bunch of notes related to the design of this heap allocator. Therefore, it is obviously messy.*
@@ -39,3 +77,4 @@ Simple implementation of a heap allocator.
 - Use XOR linked lists
 - Like GLibC allocator, have 128 bins with 64 small bins, 63 large bins and 1 unsorted bin
 - Add mechanisms to prevent heap overflow
+- Check if I can use atomics instead of a mutex for arena allocations
