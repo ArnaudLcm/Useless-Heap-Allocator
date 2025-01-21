@@ -2,6 +2,7 @@
 #include <sys/types.h>
 
 #include "bin.h"
+#include "types.h"
 
 #ifndef __ARENA_H__
 #define __ARENA_H__

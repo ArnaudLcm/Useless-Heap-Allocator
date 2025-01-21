@@ -6,7 +6,6 @@
 #include <string.h>
 #include <sys/mman.h>
 #include <sys/types.h>
-#include <threads.h>
 
 #include "list.h"
 #include "stack.h"
