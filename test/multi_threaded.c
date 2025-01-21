@@ -12,8 +12,11 @@ static void* thread_pool_alloc(void* args) {
     *allocated_int = 1234;
 
     ASSERT_TRUE(*allocated_int == 1234);
+
+    return NULL;
 }
 static void test_concurrent_allocs() {
+    ASSERT_TRUE(alloc_init() == 0);
     pthread_t threads[5];
     for (size_t i = 0; i < 5; i++) {
         pthread_create(&threads[i], NULL, thread_pool_alloc, NULL);

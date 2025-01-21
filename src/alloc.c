@@ -11,7 +11,6 @@
 #include "list.h"
 #include "stack.h"
 
-extern __thread arena_t *local_arena;
 
 static int get_bin_index_from_size(ulong size) {
     switch (size) {

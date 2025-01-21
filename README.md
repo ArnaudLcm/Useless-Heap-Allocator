@@ -2,6 +2,9 @@
 
 Simple implementation of a heap allocator.
 
+### Limitations
+- Max number of threads: 128
+
 ### Requirements
 - GCC
 
@@ -35,4 +38,3 @@ Simple implementation of a heap allocator.
 
 - Use XOR linked lists
 - Like GLibC allocator, have 128 bins with 64 small bins, 63 large bins and 1 unsorted bin
-- Add the concept of arenas to handle multi threaded contexts
