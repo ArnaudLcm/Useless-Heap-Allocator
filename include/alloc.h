@@ -37,7 +37,7 @@ _Static_assert(
 int alloc_init();
 void *alloc(ulong size);
 void *resize_alloc(void *ptr, ulong new_size);
-void *align_round_chunk(void *addr, enum RoundDirection direction);
+void *align_address(void *addr, size_t alignment, enum RoundDirection direction);
 
 int dealloc(void *ptr);
 

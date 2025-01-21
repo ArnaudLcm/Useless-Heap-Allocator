@@ -2,16 +2,14 @@
 
 #include <pthread.h>
 #include <stddef.h>
+#include <stdint.h>
 #include <string.h>
 #include <sys/mman.h>
 #include <sys/types.h>
 #include <threads.h>
-#include <stdint.h>
 
 #include "list.h"
-#include "log.h"
 #include "stack.h"
-
 
 static int get_bin_index_from_size(ulong size) {
     switch (size) {
@@ -23,24 +21,30 @@ static int get_bin_index_from_size(ulong size) {
             return 2;
     }
 }
-/*
- * @brief: This function will ensure every chunks are 4 byte aligned. By default, round it up
+/**
+ * @brief Align an address to the nearest boundary based on the given direction.
+ * @param addr The address to align.
+ * @param alignment Alignment boundary (e.g., ARCH_ALIGNMENT).
+ * @param direction The rounding direction (ROUND_UP or ROUND_DOWN).
+ * @return Aligned address.
  */
-void *align_round_chunk(void *addr, enum RoundDirection direction) {
+void *align_address(void *addr, size_t alignment, enum RoundDirection direction) {
     uintptr_t address = (uintptr_t)addr;
-
-    // If the address is already aligned, return it as is
-    if ((address & (ARCH_ALIGNMENT - 1)) == 0) {
-        return addr;
+    if ((address & (alignment - 1)) == 0) {
+        return addr;  // Already aligned
     }
+    return (direction == ROUND_DOWN) ? (void *)(address & ~(alignment - 1))
+                                     : (void *)((address + alignment - 1) & ~(alignment - 1));
+}
 
-    switch (direction) {
-        case ROUND_DOWN:
-            return (void *)(address & ~(ARCH_ALIGNMENT - 1));
-        case ROUND_UP:
-        default:
-            return (void *)((address + ARCH_ALIGNMENT - 1) & ~(ARCH_ALIGNMENT - 1));
+static bin_t *get_bin_for_size(unsigned long size, arena_t *arena) {
+    // Find the appropriate bin to handle the user request (i.e small, medium or unsorted bins)
+    int bin_index = get_bin_index_from_size(size);
+    if (arena->bin_pool[bin_index].stack_top <
+        0) {            // Case where the appropriate bin is empty (i.e no free chunk availble)
+        bin_index = 2;  // Default to unsorted bin
     }
+    return &arena->bin_pool[bin_index];
 }
 
 int alloc_init() {
@@ -68,12 +72,7 @@ static int shrink_chunk(chunk_metadata_t *metadata, ulong total_size, bin_t *bin
         new_metadata->chunk_size = remaining_size;
         new_metadata->chunk_state = CHUNK_FREE;
 
-        int receiver_bin_index = get_bin_index_from_size(remaining_size - sizeof(chunk_metadata_t));
-        bin_t *receiver_bin = &arena->bin_pool[receiver_bin_index];
-
-        if (receiver_bin->stack_top < 0) {
-            receiver_bin = &arena->bin_pool[2];
-        }
+        bin_t *receiver_bin = get_bin_for_size(remaining_size - sizeof(chunk_metadata_t), arena);
 
         struct node *new_node = stack_pop(receiver_bin);
         if (!new_node) {
@@ -87,6 +86,15 @@ static int shrink_chunk(chunk_metadata_t *metadata, ulong total_size, bin_t *bin
     return 0;
 }
 
+/**
+ * @brief Allocates memory from a specific arena.
+ * If the requested size exceeds the capacity of all bins, it defaults to the unsorted bin.
+ * For unsorted bins, it may shrink large chunks into smaller ones.
+ *
+ * @param size The requested size (aligned internally).
+ * @param arena The arena to allocate memory from.
+ * @return Pointer to the allocated memory, or NULL on failure.
+ */
 static void *alloc_with_arena(unsigned long size, arena_t *arena) {
     size = (size + ARCH_ALIGNMENT - 1) & ~(ARCH_ALIGNMENT - 1);
 
@@ -95,14 +103,7 @@ static void *alloc_with_arena(unsigned long size, arena_t *arena) {
     }
 
     // Find the appropriate bin to handle the user request (i.e small, medium or unsorted bins)
-    int bin_index = get_bin_index_from_size(size);
-
-    if (arena->bin_pool[bin_index].stack_top <
-        0) {  // Case where the appropriate bin is empty (i.e no free chunk availble)
-        bin_index = 2;
-    }
-
-    bin_t *bin = &arena->bin_pool[bin_index];
+    bin_t *bin = get_bin_for_size(size, arena);
 
     // Find the smallest suitable free node in case of unsorted bin, otherwise take the first free node
     struct node *smallest_free_node = NULL;
@@ -128,7 +129,7 @@ static void *alloc_with_arena(unsigned long size, arena_t *arena) {
 
     smallest_metadata->chunk_state = CHUNK_USED;
 
-    if (bin_index == 2) {  // Case: Unsorted bin
+    if (get_bin_index_from_size(size) == 2) {  // Case: Unsorted bin
         // Check if splitting the chunk is necessary
         if (shrink_chunk(smallest_metadata, size, bin, arena) < 0) {
             return NULL;
@@ -142,12 +143,11 @@ static void *alloc_with_arena(unsigned long size, arena_t *arena) {
 }
 
 static void *alloc_local_arena() {
-
     pthread_mutex_lock(&global_arena.mutex);
-    void* local_arena_addr = alloc_with_arena(ARENA_SIZE, &global_arena);
+    void *local_arena_addr = alloc_with_arena(ARENA_SIZE, &global_arena);
     pthread_mutex_unlock(&global_arena.mutex);
-    local_arena = (arena_t*) local_arena_addr;
-    if (local_arena_addr != NULL && init_arena(local_arena, ARENA_SIZE, (void*)local_arena + sizeof(arena_t)) == 0) {
+    local_arena = (arena_t *)local_arena_addr;
+    if (local_arena_addr != NULL && init_arena(local_arena, ARENA_SIZE, (void *)local_arena + sizeof(arena_t)) == 0) {
         return local_arena;
     }
 
@@ -157,7 +157,7 @@ static void *alloc_local_arena() {
 void *alloc(unsigned long size) {
     if (global_arena.arena_start == NULL) {  // Heap was not initialized
         return NULL;
-    }  
+    }
 
     if (local_arena == NULL && alloc_local_arena() == NULL) {
         return NULL;

@@ -30,12 +30,10 @@ __thread arena_t* local_arena = NULL;
 
 
 int init_arena(arena_t* arena, ulong arena_size, void* start_addr) {
-    arena->arena_start = align_round_chunk(start_addr, ROUND_UP);
+    arena->arena_start = align_address(start_addr, ARCH_ALIGNMENT, ROUND_UP);
     arena->arena_end = start_addr + arena_size;
 
     arena->arena_size = arena_size;
-
-    arena->arena_start = align_round_chunk(arena->arena_start, ROUND_UP);
 
     // Init free nodes stacks
     reset_bin(arena);
