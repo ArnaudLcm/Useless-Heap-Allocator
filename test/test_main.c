@@ -3,6 +3,7 @@
 
 #include "alloc.h"
 #include "list_tests.h"
+#include "multi_threaded.h"
 #include "single_threaded.h"
 #include "test.h"
 

@@ -6,6 +6,7 @@
 #include <sys/mman.h>
 #include <sys/types.h>
 #include <threads.h>
+#include <stdint.h>
 
 #include "list.h"
 #include "stack.h"
@@ -156,8 +157,7 @@ void *alloc(unsigned long size) {
     if (local_arena == NULL && alloc_local_arena() == NULL) {
         return NULL;
     }
-    void *new_alloc = alloc_with_arena(size, local_arena);
-    return new_alloc;
+    return alloc_with_arena(size, local_arena);
 }
 
 /**

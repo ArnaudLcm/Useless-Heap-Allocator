@@ -1,6 +1,7 @@
 #include "single_threaded.h"
 
 #include "alloc.h"
+#include <stdint.h>
 #include "test.h"
 
 

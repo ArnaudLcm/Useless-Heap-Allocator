@@ -1,11 +1,9 @@
 #include <pthread.h>
 #include <stdalign.h>
-#include <stdlib.h>
 #include <unistd.h>
 
 #include "arena.h"
 #include "list.h"
-#include "types.h"
 #ifndef __ALLOC_H__
 #define __ALLOC_H__
 
