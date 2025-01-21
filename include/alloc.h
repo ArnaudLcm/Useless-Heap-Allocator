@@ -15,7 +15,7 @@
 #define CHUNK_FREE 0x0
 #define CHUNK_USED 0x1
 
-#define INIT_HEAP_SIZE 0x1000
+#define INIT_HEAP_SIZE 0x500000
 
 #define MAX_CHUNK_SIZE                                                         \
   ((1 << 28) / 8) // Related to the chunk size definition in chunk_metadata_t
@@ -28,27 +28,8 @@ typedef struct {
   struct node *free_node_ptr;
 } __attribute__((packed)) chunk_metadata_t;
 
+enum RoundDirection { ROUND_UP, ROUND_DOWN };
 
-
-
-static arena_t global_arena =
-    {
-        .bin_pool = {{.stack = {0},
-                      .bin_nodes = {INIT_NODE(NULL)},
-                      .stack_top = MAX_BIN_SIZE - 1,
-                      .free_list = INIT_LIST(NULL, NULL)},
-                     {.stack = {0},
-                      .bin_nodes = {INIT_NODE(NULL)},
-                      .stack_top = MAX_BIN_SIZE - 1,
-                      .free_list = INIT_LIST(NULL, NULL)},
-                     {.stack = {0},
-                      .bin_nodes = {INIT_NODE(NULL)},
-                      .stack_top = MAX_BIN_SIZE - 1,
-                      .free_list = INIT_LIST(NULL, NULL)}},
-        .arena_size = 0,
-        .arena_end = NULL,
-        .arena_start = NULL,
-};
 
 _Static_assert(
     sizeof(chunk_metadata_t) == 12,
@@ -58,6 +39,7 @@ _Static_assert(
 int alloc_init();
 void *alloc(ulong size);
 void *resize_alloc(void *ptr, ulong new_size);
+void *align_round_chunk(void *addr, enum RoundDirection direction);
 
 int dealloc(void *ptr);
 

@@ -3,7 +3,6 @@
 
 #include "alloc.h"
 #include "list_tests.h"
-#include "multi_threaded.h"
 #include "single_threaded.h"
 #include "test.h"
 
@@ -16,8 +15,8 @@ int main(int argc, char *argv[]) {
     test_single_threaded_batch();
     end_test_batch();
 
-    // new_test_batch("test_multi_threaded");
-    // test_multi_threaded_batch();
-    // end_test_batch();
+    new_test_batch("test_multi_threaded");
+    test_multi_threaded_batch();
+    end_test_batch();
     return 0;
 }
