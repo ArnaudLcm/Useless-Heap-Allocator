@@ -8,7 +8,8 @@
 #define __ASSERT(b) assert_true(b, __FILE__, __LINE__, __func__)
 
 #define ASSERT_TRUE(b) __ASSERT(b);
-#define ASSERT_TRUE_FATAL(b) if(!__ASSERT(b)) { TEST_CLEAN; return; }
+#define ASSERT_TRUE_FATAL(b) if(!__ASSERT(b)) {  return; }
+#define ASSERT_TRUE_FATAL_RETURN(b, r) if(!__ASSERT(b)) {  return r;}
 
 void new_test_batch(char* name);
 

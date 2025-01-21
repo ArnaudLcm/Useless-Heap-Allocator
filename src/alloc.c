@@ -9,6 +9,7 @@
 #include <stdint.h>
 
 #include "list.h"
+#include "log.h"
 #include "stack.h"
 
 
@@ -141,12 +142,15 @@ static void *alloc_with_arena(unsigned long size, arena_t *arena) {
 }
 
 static void *alloc_local_arena() {
+
     pthread_mutex_lock(&global_arena.mutex);
-    local_arena = (arena_t *)alloc_with_arena(ARENA_SIZE, &global_arena);
+    void* local_arena_addr = alloc_with_arena(ARENA_SIZE, &global_arena);
     pthread_mutex_unlock(&global_arena.mutex);
-    if (local_arena != NULL && init_arena(local_arena, ARENA_SIZE, (void*)local_arena + sizeof(arena_t)) == 0) {
+    local_arena = (arena_t*) local_arena_addr;
+    if (local_arena_addr != NULL && init_arena(local_arena, ARENA_SIZE, (void*)local_arena + sizeof(arena_t)) == 0) {
         return local_arena;
     }
+
     return NULL;
 }
 
