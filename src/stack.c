@@ -2,6 +2,12 @@
 #include <stdlib.h>
 #include <stddef.h>
 
+void init_stack(int* stack) {
+    for (int i = 0; i < MAX_BIN_SIZE; i++) {
+        stack[i] = i;
+    }
+}
+
 
 struct node *stack_pop(bin_t *bin) {
     if (bin->stack_top < 0) {

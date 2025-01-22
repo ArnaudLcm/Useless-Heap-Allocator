@@ -14,8 +14,6 @@
 #define CHUNK_FREE 0x0
 #define CHUNK_USED 0x1
 
-#define INIT_HEAP_SIZE 0x500000
-
 #define MAX_CHUNK_SIZE                                                         \
   ((1 << 28) / 8) // Related to the chunk size definition in chunk_metadata_t
 

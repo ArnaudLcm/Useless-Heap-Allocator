@@ -67,9 +67,6 @@ make
     
   *We should have more free lists like the glibc does to be more exhaustive but for now let's remain simple.*
 
-- Free list managements: They are allocated statically and we manage which node is free through a stack
-
-
 ### Notes - Features I could implement
 
 *List of features I could consider to improve the current state of the allocator*:

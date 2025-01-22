@@ -7,6 +7,7 @@
 #include <sys/mman.h>
 #include <sys/types.h>
 
+#include "defs.h"
 #include "list.h"
 #include "stack.h"
 

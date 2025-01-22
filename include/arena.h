@@ -9,6 +9,14 @@
 
 #define ARENA_SIZE 1024 * 1024
 
+
+typedef struct {
+    void* arena_start;
+    void* arena_end;
+    int arena_size;
+    bin_t arena_bin;
+} global_arena_t;
+
 typedef struct {
     void* arena_start;
     void* arena_end;

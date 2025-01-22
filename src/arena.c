@@ -65,5 +65,6 @@ void reset_bin(arena_t* arena) {
                                      .bin_nodes = {INIT_NODE(NULL)},
                                      .stack_top = MAX_BIN_SIZE - 1,
                                      .free_list = INIT_LIST(NULL, NULL)};
+        init_stack(arena->bin_pool[i].stack);
     }
 }
